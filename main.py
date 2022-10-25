@@ -21,6 +21,7 @@ def kernel_gauss(x, y, gamma):
 df = pd.read_csv('../LAOMLProject1/EastWestAirlinesCluster.csv')
 df = df.drop(columns=['ID#'])
 normalized_df = (df - df.min()) / (df.max() - df.min())
+data = normalized_df.to_numpy()
 
 # define parameters
 K = 4
@@ -30,10 +31,10 @@ n = 3998
 ### MAIN
 # initialise clusters
 C = np.random.uniform(low=0, high=1, size=(K, ncol))
-dists = np.zeros(3998, K)
-for i in range(0, n + 1):
-    for k in range(1, K + 1):
-        dists[i, k] = kernel_euclidean(normalized_df.data[i, :], C[k, :])
+dists = np.zeros(shape=(3998, K))
+for i in range(0, n):
+    for k in range(0, K):
+        dists[i, k] = kernel_euclidean(data[i, :], C[k, :])
 
 #
 
