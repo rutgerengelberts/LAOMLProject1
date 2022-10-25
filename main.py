@@ -2,5 +2,6 @@
 import pandas as pd
 
 # read data
-file = pd.read_csv('/EastWestAirlinesCluster.csv')
+data = pd.read_csv('../LAOMLProject1/EastWestAirlinesCluster.csv')
 
+# test
