@@ -3,6 +3,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import time
 
 
 # functions
@@ -62,25 +63,39 @@ data = normalized_df.to_numpy()
 
 
 # define parameters
-nruns = 10
-Ks = [2, 3, 4, 5, 6]
+nruns = 100
+Ks = [2, 3, 4, 5, 6, 7, 8]
 nKs = len(Ks)
 
 
 # run kmeans
 scores = np.zeros(shape=(nruns, nKs))
+times = np.zeros(shape=(nKs,))
 for i in range(nKs):
     ki = Ks[i]
     print("k = "+str(ki)+" ...")
     for ni in range(nruns):
-        scores[ni, i] = kmeans_euc(data, ki)
+        succes = False
+        while not succes:
+            try:
+                start = time.time()
+                score = kmeans_euc(data, ki)
+                timei = time.time() - start
+            except ZeroDivisionError:
+                print("empty cluster for k="+str(ki)+",n="+str(ni)+", trying again")
+            else:
+                succes = True
+                scores[ni, i] = score
+                times[i] += timei
+    times[i] = times[i] / nruns
+    print("avg time per run is %.3f seconds" % times[i])
 
 
 # plot
 fig = plt.figure(figsize=(10, 7))
 ax = fig.add_subplot(111)
 bp = ax.boxplot(scores)
-ax.set_xticklabels(['2', '3', '4'])
+ax.set_xticklabels([str(ki) for ki in Ks])
 plt.show()
 
 
