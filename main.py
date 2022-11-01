@@ -26,6 +26,8 @@ def kmeans_euc(dat, K):
     score = 10 ** 12
     # initialise clusters and distances of points to clusters
     C = np.clip(np.random.multivariate_normal(np.mean(data, axis=0), np.diag(np.std(data, axis=0)), size=(K,)), 0, 1)
+    # uncomment for uniform distribution of clusters instead
+    # C = np.random.uniform(low=0, high=1, size=(K, ncol))
     dists = np.zeros(shape=(n, K))
     # run until no improvement
     iter = 0
@@ -40,17 +42,10 @@ def kmeans_euc(dat, K):
         clusters = np.array([np.argmin(dists[i, :]) for i in range(n)])
         # update centroid locations
         for k in range(K):
-            # ixgrid = np.ix_(np.where(clusters == k)[0], np.arange(ncol))
-            # dat = data[ixgrid]
-            # C[k, :] = np.sum(data[ixgrid], axis=0)
             C[k, :] = sum([dat[i, :] for i in range(n) if clusters[i] == k]) / np.count_nonzero(clusters == k)
         # calc score
         nclust = [np.count_nonzero(clusters == i) for i in range(K)]
-        score = sum([sum([dists[i, k] for i in range(n) if clusters[i] == k]) for k in range(K)])
-        # print division of clusters
-        # print(iter)
-        # print(nclust)
-        # print(clusters)
+        score = sum([sum([dists[i, k]**2 for i in range(n) if clusters[i] == k]) for k in range(K)])
         iter += 1
     return score
 
@@ -62,33 +57,34 @@ def kmeans_gauss(dat, K, gamma):
     score = 10 ** 12
     # initialise clusters and distances of points to clusters
     C = np.clip(np.random.multivariate_normal(np.mean(data, axis=0), np.diag(np.std(data, axis=0)), size=(K,)), 0, 1)
-    #C = np.random.uniform(low=0, high=1, size=(K, ncol))
     dists = np.zeros(shape=(n, K))
+    # calc initial distances to clusters
+    for i in range(n):
+        for k in range(K):
+            dists[i, k] = kernel_gauss(dat[i, :], dat[i, :]) - 2*kernel_gauss(dat[i, :], C[k, :], gamma) + kernel_gauss(C[k, :], C[k, :], gamma)
+    # calc initial cluster assignment
+    clusters = np.array([np.argmin(dists[i, :]) for i in range(n)])
     # run until no improvement
     iter = 0
     while score < best:
         # update new best
         best = score
         # update distances
+        clustersums = [sum([sum([kernel_gauss(dat[i, :], dat[j, :], gamma) for i in range(n) if clusters[i] == k]) for j in range(n) if clusters[j] == k]) / np.count_nonzero(clusters == k)**2 for k in range(K)]
         for i in range(n):
             for k in range(K):
-                dists[i, k] = kernel_gauss(dat[i, :], C[k, :], gamma)
+                dists[i, k] = kernel_gauss(dat[i, :], dat[i, :], gamma) + sum([kernel_gauss(dat[i, :], dat[j, :], gamma) for j in range(n) if clusters[j] == clusters[i]]) / np.count_nonzero(clusters == k) + clustersums[k]
         # assign to clusters based on distances
         clusters = np.array([np.argmin(dists[i, :]) for i in range(n)])
-        # update centroid locations
-        for k in range(K):
-            # ixgrid = np.ix_(np.where(clusters == k)[0], np.arange(ncol))
-            # dat = data[ixgrid]
-            # C[k, :] = np.sum(data[ixgrid], axis=0)
-            C[k, :] = sum([dat[i, :] for i in range(n) if clusters[i] == k]) / np.count_nonzero(clusters == k)
         # calc score
         nclust = [np.count_nonzero(clusters == i) for i in range(K)]
         score = sum([sum([dists[i, k] for i in range(n) if clusters[i] == k]) for k in range(K)])
-        # print division of clusters
-        # print(iter)
-        # print(nclust)
-        # print(clusters)
         iter += 1
+    # recalc score according to ESS
+    for i in range(n):
+        for k in range(K):
+            dists[i, k] = kernel_euclidean(dat[i, :], C[k, :])
+    score = sum([sum([dists[i, k] for i in range(n) if clusters[i] == k]) for k in range(K)])
     return score
 
 
@@ -99,7 +95,6 @@ def kmeans_poly(dat, K, r):
     score = 10 ** 12
     # initialise clusters and distances of points to clusters
     C = np.clip(np.random.multivariate_normal(np.mean(data, axis=0), np.diag(np.std(data, axis=0)), size=(K,)), 0, 1)
-    #C = np.random.uniform(low=0, high=1, size=(K, ncol))
     dists = np.zeros(shape=(n, K))
     # run until no improvement
     iter = 0
@@ -114,17 +109,10 @@ def kmeans_poly(dat, K, r):
         clusters = np.array([np.argmin(dists[i, :]) for i in range(n)])
         # update centroid locations
         for k in range(K):
-            # ixgrid = np.ix_(np.where(clusters == k)[0], np.arange(ncol))
-            # dat = data[ixgrid]
-            # C[k, :] = np.sum(data[ixgrid], axis=0)
             C[k, :] = sum([dat[i, :] for i in range(n) if clusters[i] == k]) / np.count_nonzero(clusters == k)
         # calc score
         nclust = [np.count_nonzero(clusters == i) for i in range(K)]
         score = sum([sum([dists[i, k] for i in range(n) if clusters[i] == k]) for k in range(K)])
-        # print division of clusters
-        # print(iter)
-        # print(nclust)
-        # print(clusters)
         iter += 1
     return score
 
@@ -178,7 +166,7 @@ def kmeans_poli2(dat, K, r):
 
 
 ### MAIN
-# read data
+# read data, normalize and store as numpy array
 df = pd.read_csv('../LAOMLProject1/EastWestAirlinesCluster.csv')
 df = df.drop(columns=['ID#'])
 normalized_df = (df - df.min()) / (df.max() - df.min())
@@ -189,7 +177,7 @@ data = normalized_df.to_numpy()
 nruns = 100
 Ks = [2, 3, 4, 5, 6, 7, 8]
 nKs = len(Ks)
-gam = 0.5
+gam = 1
 rr = 2
 
 
@@ -204,7 +192,7 @@ for i in range(nKs):
         while not succes:
             try:
                 start = time.time()
-                score = kmeans_gauss(data, ki, rr)
+                score = kmeans_gauss(data, ki, rr) # choose kernel method here
                 timei = time.time() - start
             except ZeroDivisionError:
                 print("empty cluster for k="+str(ki)+",n="+str(ni)+", trying again; ", end='')
@@ -217,7 +205,8 @@ for i in range(nKs):
     print("avg time per run is %.3f seconds" % times[i])
 
 
-# plot
+### PLOT
+# achieved score versus number of clusters k
 fig = plt.figure(figsize=(10, 7))
 ax = fig.add_subplot(111)
 bp = ax.boxplot(scores)
@@ -226,8 +215,9 @@ ax.set_xlabel('K')
 ax.set_ylabel('Score')
 plt.show()
 
-# save times to file
-f = open('../LAOMLProject1/times gauss05.txt')
+# save avg time of kmeans per k to file
+f = open('../LAOMLProject1/times gauss1 v2.txt', 'w')
+f.write("k\td\n")
 for i in range(nKs):
-    f.write("%d\t$.3f\n" % Ks[i], times[i])
+    f.write("%d\t$.3f\n" % (Ks[i], times[i]))
 f.close()
