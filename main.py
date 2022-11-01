@@ -236,7 +236,7 @@ def unnormalized_spectral_clustering(X,K):
     V_K = np.real(V[:, ind[:K]])
     return kmeans_euc(V_K,K)
 
-def normalized_spectral_clustering(X,k):
+def normalized_spectral_clustering(X,K):
     L = normalized_Laplacian(X)
     start = time.time()
     Lambdas, V = np.linalg.eig(L)
