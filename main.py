@@ -25,7 +25,7 @@ def kmeans_euc(dat, K):
     best = 10 ** 12 + 1
     score = 10 ** 12
     # initialise clusters and distances of points to clusters
-    C = np.clip(np.random.multivariate_normal(np.mean(data, axis=0), np.diag(np.std(data, axis=0)), size=(K,)), 0, 1)
+    C = np.clip(np.random.multivariate_normal(np.mean(dat, axis=0), np.diag(np.std(dat, axis=0)), size=(K,)), 0, 1)
     # uncomment for uniform distribution of clusters instead
     # C = np.random.uniform(low=0, high=1, size=(K, ncol))
     dists = np.zeros(shape=(n, K))
@@ -64,14 +64,17 @@ def kmeans_gauss(dat, K, gamma):
     best = 10 ** 12 + 1
     score = 10 ** 12
     # initialise clusters and distances of points to clusters
-    C = np.clip(np.random.multivariate_normal(np.mean(data, axis=0), np.diag(np.std(data, axis=0)), size=(K,)), 0, 1)
+    #C = np.clip(np.random.multivariate_normal(np.mean(dat, axis=0), np.diag(np.std(dat, axis=0)), size=(K,)), 0, 1)
+    # uncomment for uniform distribution of clusters instead
+    C = np.random.uniform(low=0, high=1, size=(K, ncol))
     kmat = np.zeros(shape=(n, n))
     dists = np.zeros(shape=(n, K))
     # calc initial distances to clusters
     print("calcing init dists")
     for i in range(n):
         for k in range(K):
-            dists[i, k] = kmatval(kmat, dat, i, i, gamma) - 2*kernel_gauss(dat[i, :], C[k, :], gamma) + kernel_gauss(C[k, :], C[k, :], gamma)
+            dists[i, k] = kmatval(kmat, dat, i, i, gamma) - 2*kernel_gauss(dat[i, :], C[k, :], gamma) \
+                          + kernel_gauss(C[k, :], C[k, :], gamma)
     # calc initial cluster assignment
     clusters = np.array([np.argmin(dists[i, :]) for i in range(n)])
     # run until no improvement
@@ -81,10 +84,14 @@ def kmeans_gauss(dat, K, gamma):
         best = score
         # update distances
         print("updating dists")
-        clustersums = [sum([kmatval(kmat, dat, i, j, gamma) for i in range(n) for j in range(n) if ((clusters[j] == k) and (clusters[i] == k))]) / np.count_nonzero(clusters == k)**2 for k in range(K)]
+        clustersums = [sum([kmatval(kmat, dat, i, j, gamma) for i in range(n) for j in range(n) \
+                            if ((clusters[j] == k) and (clusters[i] == k))]) / np.count_nonzero(clusters == k)**2 \
+                       for k in range(K)]
         for i in range(n):
             for k in range(K):
-                dists[i, k] = kmatval(kmat, dat, i, i, gamma) + sum([kmatval(kmat, dat, i, j, gamma) for j in range(n) if clusters[j] == clusters[i]]) / np.count_nonzero(clusters == k) + clustersums[k]
+                dists[i, k] = kmatval(kmat, dat, i, i, gamma) + \
+                              sum([kmatval(kmat, dat, i, j, gamma) for j in range(n) if (clusters[j] == k)]) \
+                              / np.count_nonzero(clusters == k) + clustersums[k]
         # assign to clusters based on distances
         print("assigning clusts")
         clusters = np.array([np.argmin(dists[i, :]) for i in range(n)])
@@ -101,7 +108,7 @@ def kmeans_poly(dat, K, r):
     best = 10 ** 12 + 1
     score = 10 ** 12
     # initialise clusters and distances of points to clusters
-    C = np.clip(np.random.multivariate_normal(np.mean(data, axis=0), np.diag(np.std(data, axis=0)), size=(K,)), 0, 1)
+    C = np.clip(np.random.multivariate_normal(np.mean(dat, axis=0), np.diag(np.std(dat, axis=0)), size=(K,)), 0, 1)
     dists = np.zeros(shape=(n, K))
     # run until no improvement
     iter = 0
@@ -181,10 +188,10 @@ data = normalized_df.to_numpy()
 
 
 # define parameters
-nruns = 10
+nruns = 1
 Ks = [2, 3, 4, 5]
 nKs = len(Ks)
-gam = 1
+gam = 0.5
 rr = 2
 
 
@@ -214,10 +221,18 @@ for i in range(nKs):
 
 ### PLOT
 # achieved score versus number of clusters k
+# fig = plt.figure(figsize=(10, 7))
+# ax = fig.add_subplot(111)
+# bp = ax.boxplot(scores)
+# ax.set_xticklabels([str(ki) for ki in Ks])
+# ax.set_xlabel('K')
+# ax.set_ylabel('Score')
+# plt.show()
+
+# lineplot score vs k for kernel methods
 fig = plt.figure(figsize=(10, 7))
 ax = fig.add_subplot(111)
-bp = ax.boxplot(scores)
-ax.set_xticklabels([str(ki) for ki in Ks])
+lp = ax.plot(Ks, scores)
 ax.set_xlabel('K')
 ax.set_ylabel('Score')
 plt.show()
