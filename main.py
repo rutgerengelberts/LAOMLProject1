@@ -24,11 +24,23 @@ def kmeans_euc(dat, K):
     n, ncol = dat.shape
     best = 10 ** 12 + 1
     score = 10 ** 12
-    # initialise clusters and distances of points to clusters
-    C = np.clip(np.random.multivariate_normal(np.mean(dat, axis=0), np.diag(np.std(dat, axis=0)), size=(K,)), 0, 1)
-    # uncomment for uniform distribution of clusters instead
-    # C = np.random.uniform(low=0, high=1, size=(K, ncol))
-    dists = np.zeros(shape=(n, K))
+    emptyclusters = True
+    while emptyclusters:
+        # initialise clusters and distances of points to clusters
+        C = np.clip(np.random.multivariate_normal(np.mean(dat, axis=0), np.diag(np.std(dat, axis=0)), size=(K,)), 0, 1)
+        # uncomment for uniform distribution of clusters instead
+        # C = np.random.uniform(low=0, high=1, size=(K, ncol))
+        dists = np.zeros(shape=(n, K))
+        # update distances
+        for i in range(n):
+            for k in range(K):
+                dists[i, k] = kernel_euclidean(dat[i, :], C[k, :])
+        # assign to clusters based on distances
+        clusters = np.array([np.argmin(dists[i, :]) for i in range(n)])
+        if all([np.count_nonzero(clusters == k) > 0 for k in range(K)]):
+            emptyclusters = False
+        else:
+            print("empty cluster, trying again")
     # run until no improvement
     iter = 0
     while score < best:
@@ -63,20 +75,26 @@ def kmeans_gauss(dat, K, gamma):
     n, ncol = dat.shape
     best = 10 ** 12 + 1
     score = 10 ** 12
-    # initialise clusters and distances of points to clusters
-    #C = np.clip(np.random.multivariate_normal(np.mean(dat, axis=0), np.diag(np.std(dat, axis=0)), size=(K,)), 0, 1)
-    # uncomment for uniform distribution of clusters instead
-    C = np.random.uniform(low=0, high=1, size=(K, ncol))
-    kmat = np.zeros(shape=(n, n))
-    dists = np.zeros(shape=(n, K))
-    # calc initial distances to clusters
-    print("calcing init dists")
-    for i in range(n):
-        for k in range(K):
-            dists[i, k] = kmatval(kmat, dat, i, i, gamma) - 2*kernel_gauss(dat[i, :], C[k, :], gamma) \
-                          + kernel_gauss(C[k, :], C[k, :], gamma)
-    # calc initial cluster assignment
-    clusters = np.array([np.argmin(dists[i, :]) for i in range(n)])
+    emptyclusters = True
+    while emptyclusters:
+        # initialise clusters and distances of points to clusters
+        #C = np.clip(np.random.multivariate_normal(np.mean(dat, axis=0), np.diag(np.std(dat, axis=0)), size=(K,)), 0, 1)
+        # uncomment for uniform distribution of clusters instead
+        C = np.random.uniform(low=0, high=1, size=(K, ncol))
+        kmat = np.zeros(shape=(n, n))
+        dists = np.zeros(shape=(n, K))
+        # calc initial distances to clusters
+        print("calcing init dists")
+        for i in range(n):
+            for k in range(K):
+                dists[i, k] = kmatval(kmat, dat, i, i, gamma) - 2*kernel_gauss(dat[i, :], C[k, :], gamma) \
+                              + kernel_gauss(C[k, :], C[k, :], gamma)
+        # calc initial cluster assignment
+        clusters = np.array([np.argmin(dists[i, :]) for i in range(n)])
+        if all([np.count_nonzero(clusters == k) > 0 for k in range(K)]):
+            emptyclusters = False
+        else:
+            print("empty cluster, trying again")
     # run until no improvement
     iter = 0
     while score < best:
