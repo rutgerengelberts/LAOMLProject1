@@ -196,6 +196,56 @@ def kmeans_poli2(dat, K, r):
 
     return score
 
+def sim_matrix(X):
+    start = time.time()
+    B = X.shape[0]
+    W = np.zeros((B, B))
+    for i in range(B):
+        for j in range(i):
+            W[i, j] = kernel_gauss(X[i, :], X[j, :],gam)
+            W[j, i] = W[i, j]
+    time_sim = time.time() - start
+    print("Computation time similarity matrix: ",time_sim)
+    return W
+
+def Laplacian(X):
+    W = sim_matrix(X)
+    start = time.time()
+    D = np.diag(np.sum(W, axis=1))
+    L = D - W
+    time_lap = time.time() - start
+    print("Computation time laplacian matrix: ",time_lap)
+    return L
+
+def normalized_Laplacian(X):
+    W = sim_matrix(X)
+    start = time.time()
+    D_inv_half = np.diag(np.sqrt(np.sum(W, axis=1)))
+    L_= np.identity(X.shape[0]) - D_inv_half*W*D_inv_half
+    time_norm_lap = time.time() - start
+    print("Computation time normalized laplacian matrix: ", time_norm_lap)
+    return L_
+
+def unnormalized_spectral_clustering(X,K):
+    L = Laplacian(X)
+    start = time.time()
+    Lambdas, V = np.linalg.eig(L)
+    time_eig = time.time() - start
+    print("Computation time eigen-solver: ",time_eig)
+    ind = np.argsort(np.linalg.norm(np.reshape(Lambdas, (1, len(Lambdas))), axis=0))
+    V_K = np.real(V[:, ind[:K]])
+    return kmeans_euc(V_K,K)
+
+def normalized_spectral_clustering(X,k):
+    L = normalized_Laplacian(X)
+    start = time.time()
+    Lambdas, V = np.linalg.eig(L)
+    time_eig = time.time() - start
+    print("Computation time eigen-solver: ", time_eig)
+    ind = np.argsort(np.linalg.norm(np.reshape(Lambdas, (1, len(Lambdas))), axis=0))
+    V_K = np.real(V[:, ind[:K]])
+    return kmeans_euc(V_K, K)
+
 
 ### MAIN
 # read data, normalize and store as numpy array
@@ -261,3 +311,5 @@ f.write("k\td\n")
 for i in range(nKs):
     f.write("%d\t$.3f\n" % (Ks[i], times[i]))
 f.close()
+
+
