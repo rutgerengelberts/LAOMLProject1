@@ -129,6 +129,54 @@ def kmeans_poly(dat, K, r):
     return score
 
 
+def kmeans_poli2(dat, K, r):
+    # initialise parameters
+    n, ncol = dat.shape
+    best = 10 ** 12 + 1
+    score = 10 ** 12
+
+    # initialise clusters and distances of points to clusters
+    clusters = np.random.randint(0, K, size=n)
+    dists = np.zeros(shape=(n, K))
+    kernel_dists = np.zeros(shape=(n, n))
+    kernel_dists_2 = np.zeros(shape=(K))
+
+    for i in range(n):
+        kernel_dists[i, i] = kernel_poly(dat[i, :], dat[i, :], r)
+        for j in range(i + 1, n):
+            kernel_dists[i, j] = kernel_poly(dat[i, :], dat[j, :], r)
+            kernel_dists[j, i] = kernel_dists[i, j]
+
+    # run until no improvement
+    iter = 0
+
+    while score < best:
+        # update new best
+        best = score
+        # update distances
+        for k in range(K):
+            kernel_dists_2[k] = sum([kernel_dists[i, j] for i in range(n) for j in range(n) if
+                                     ((clusters[i] == k) and (clusters[j] == k))]) / (
+                                            np.count_nonzero(clusters == k) ** 2)
+
+        for i in range(n):
+            for k in range(K):
+                dists[i, k] = kernel_dists[i, i] - 2 * sum(
+                    [kernel_dists[i, j] for j in range(n) if clusters[j] == k]) / np.count_nonzero(clusters == k) + \
+                              kernel_dists_2[k]
+        # assign to clusters based on distances
+        clusters = np.array([np.argmin(dists[i, :]) for i in range(n)])
+
+        score = sum([sum([dists[i, k] for i in range(n) if clusters[i] == k]) for k in range(K)])
+        # print division of clusters
+        # print(iter)
+        # print(nclust)
+        # print(clusters)
+        iter += 1
+
+    return score
+
+
 ### MAIN
 # read data
 df = pd.read_csv('../LAOMLProject1/EastWestAirlinesCluster.csv')
