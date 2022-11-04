@@ -196,6 +196,13 @@ def kmeans_poly(dat, K, r):
     best = 10 ** 12 + 1
     score = 10 ** 12
     kmat = np.zeros(shape=(n, n))
+    # fill kmat
+    print("filling kmat")
+    for i in range(n):
+        kmat[i, i] = kernel_poly(dat[i, :], dat[i, :], r)
+        for j in range(i + 1, n):
+            kmat[i, j] = kernel_poly(dat[i, :], dat[j, :], r)
+            kmat[j, i] = kmat[i, j]
     emptyclusters = True
     while emptyclusters:
         # initialise clusters and distances of points to clusters
@@ -205,12 +212,12 @@ def kmeans_poly(dat, K, r):
         dists = np.zeros(shape=(n, K))
         # calc initial distances to clusters
         print("calcing init dists")
-        for i in range(n):
-            for k in range(K):
-                dists[i, k] = kmatvalpoly(kmat, dat, i, i, r) - 2 * kernel_poly(dat[i, :], C[k, :], r) \
-                              + kernel_poly(C[k, :], C[k, :], r)
+        for k in range(K):
+            clustersum = kernel_poly(C[k, :], C[k, :], r)
+            for i in range(n):
+                dists[i, k] = kmat[i, i] - 2 * kernel_poly(dat[i, :], C[k, :], r) + clustersum
         # calc initial cluster assignment
-        clusters = np.array([np.argmin(dists[i, :]) for i in range(n)])
+        clusters = np.argmin(dists, axis=1)
         if all([np.count_nonzero(clusters == k) > 0 for k in range(K)]):
             emptyclusters = False
         else:
@@ -222,20 +229,25 @@ def kmeans_poly(dat, K, r):
         best = score
         # update distances
         print("updating dists")
-        clustersums = [sum([kmatvalpoly(kmat, dat, i, j, r) for i in range(n) for j in range(n) \
-                            if ((clusters[j] == k) and (clusters[i] == k))]) / np.count_nonzero(clusters == k) ** 2 \
-                       for k in range(K)]
-        for i in range(n):
-            for k in range(K):
-                dists[i, k] = kmatvalpoly(kmat, dat, i, i, r) - \
-                              2*sum([kmatvalpoly(kmat, dat, i, j, r) for j in range(n) if (clusters[j] == k)]) \
-                              / np.count_nonzero(clusters == k) + clustersums[k]
+        clustnumel = np.zeros(shape=(K,))
+        clustersums2 = np.zeros(shape=(K,))
+        for k in range(K):
+            mask = np.where(clusters == k)
+            clustnumel[k] = np.count_nonzero(clusters == k)
+            clusterpartial = np.transpose(kmat[mask])
+            clustersums2[k] = np.sum(clusterpartial[mask]) / (clustnumel[k] ** 2)
+        # clustersums = [sum([kmatval(kmat, dat, i, j, gamma) for i in range(n) for j in range(n) \
+        #                     if ((clusters[j] == k) and (clusters[i] == k))]) / np.count_nonzero(clusters == k)**2 \
+        #                for k in range(K)]
+        for k in range(K):
+            mask = np.where(clusters == k)
+            for i in range(n):
+                dists[i, k] = kmat[i, i] - 2 * np.sum(kmat[i, mask]) / clustnumel[k] + clustersums2[k]
         # assign to clusters based on distances
         print("assigning clusts")
-        clusters = np.array([np.argmin(dists[i, :]) for i in range(n)])
+        clusters = np.argmin(dists, axis=1)
         # calc score
-        nclust = [np.count_nonzero(clusters == i) for i in range(K)]
-        score = sum([dists[i, k] for i in range(n) for k in range(K) if (clusters[i] == k)])
+        score = np.sum(np.choose(clusters, dists.transpose()))
         iter += 1
     return score
 
@@ -350,7 +362,7 @@ data = normalized_df.to_numpy()
 nruns = 10
 Ks = [2, 3, 4, 5, 6, 7, 8]
 nKs = len(Ks)
-gam = 0.5
+gam = 1
 rr = 2
 
 
@@ -365,7 +377,7 @@ for i in range(nKs):
         while not succes:
             try:
                 start = time.time()
-                score = kmeans_gauss_2(data, ki, gam)  # choose kernel method here
+                score = kmeans_poly(data, ki, rr)  # choose kernel method here
                 timei = time.time() - start
             except ZeroDivisionError:
                 print("division by zero somehow for for k="+str(ki)+",n="+str(ni)+", trying again; ")
@@ -398,7 +410,7 @@ plt.show()
 # plt.show()
 
 # save avg time of kmeans per k to file
-f = open('../LAOMLProject1/times gauss1 v2.txt', 'w')
+f = open('../LAOMLProject1/times poly2.txt', 'w')
 f.write("k\td\n")
 for i in range(nKs):
     f.write(f'{Ks[i]:10d}\t{times[i]:.3f}\n')
