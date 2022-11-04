@@ -75,13 +75,13 @@ def kmeans_gauss(dat, K, gamma):
     n, ncol = dat.shape
     best = 10 ** 12 + 1
     score = 10 ** 12
+    kmat = np.zeros(shape=(n, n))
     emptyclusters = True
     while emptyclusters:
         # initialise clusters and distances of points to clusters
         #C = np.clip(np.random.multivariate_normal(np.mean(dat, axis=0), np.diag(np.std(dat, axis=0)), size=(K,)), 0, 1)
         # uncomment for uniform distribution of clusters instead
         C = np.random.uniform(low=0, high=1, size=(K, ncol))
-        kmat = np.zeros(shape=(n, n))
         dists = np.zeros(shape=(n, K))
         # calc initial distances to clusters
         print("calcing init dists")
@@ -107,17 +107,87 @@ def kmeans_gauss(dat, K, gamma):
                        for k in range(K)]
         for i in range(n):
             for k in range(K):
-                dists[i, k] = kmatval(kmat, dat, i, i, gamma) + \
-                              sum([kmatval(kmat, dat, i, j, gamma) for j in range(n) if (clusters[j] == k)]) \
+                dists[i, k] = kmatval(kmat, dat, i, i, gamma) - \
+                              2*sum([kmatval(kmat, dat, i, j, gamma) for j in range(n) if (clusters[j] == k)]) \
                               / np.count_nonzero(clusters == k) + clustersums[k]
         # assign to clusters based on distances
         print("assigning clusts")
         clusters = np.array([np.argmin(dists[i, :]) for i in range(n)])
         # calc score
-        nclust = [np.count_nonzero(clusters == i) for i in range(K)]
         score = sum([dists[i, k] for i in range(n) for k in range(K) if (clusters[i] == k)])
         iter += 1
     return score
+
+
+def kmeans_gauss_2(dat, K, gamma):
+    # initialise parameters
+    n, ncol = dat.shape
+    best = 10 ** 12 + 1
+    score = 10 ** 12
+    kmat = np.zeros(shape=(n, n))
+    # fill kmat
+    print("filling kmat")
+    for i in range(n):
+        kmat[i, i] = kernel_gauss(dat[i, :], dat[i, :], gamma)
+        for j in range(i + 1, n):
+            kmat[i, j] = kernel_gauss(dat[i, :], dat[j, :], gamma)
+            kmat[j, i] = kmat[i, j]
+    emptyclusters = True
+    while emptyclusters:
+        # initialise clusters and distances of points to clusters
+        #C = np.clip(np.random.multivariate_normal(np.mean(dat, axis=0), np.diag(np.std(dat, axis=0)), size=(K,)), 0, 1)
+        # uncomment for uniform distribution of clusters instead
+        C = np.random.uniform(low=0, high=1, size=(K, ncol))
+        dists = np.zeros(shape=(n, K))
+        # calc initial distances to clusters
+        print("calcing init dists")
+        for k in range(K):
+            clustersum = kernel_gauss(C[k, :], C[k, :], gamma)
+            for i in range(n):
+                dists[i, k] = kmat[i, i] - 2*kernel_gauss(dat[i, :], C[k, :], gamma) + clustersum
+        # calc initial cluster assignment
+        clusters = np.argmin(dists, axis=1)
+        if all([np.count_nonzero(clusters == k) > 0 for k in range(K)]):
+            emptyclusters = False
+        else:
+            print("empty cluster, trying again")
+    # run until no improvement
+    iter = 0
+    while score < best:
+        # update new best
+        best = score
+        # update distances
+        print("updating dists")
+        clustnumel = np.zeros(shape=(K,))
+        clustersums2 = np.zeros(shape=(K,))
+        for k in range(K):
+            mask = np.where(clusters == k)
+            clustnumel[k] = np.count_nonzero(clusters == k)
+            clusterpartial = np.transpose(kmat[mask])
+            clustersums2[k] = np.sum(clusterpartial[mask]) / (clustnumel[k] ** 2)
+        # clustersums = [sum([kmatval(kmat, dat, i, j, gamma) for i in range(n) for j in range(n) \
+        #                     if ((clusters[j] == k) and (clusters[i] == k))]) / np.count_nonzero(clusters == k)**2 \
+        #                for k in range(K)]
+        for k in range(K):
+            mask = np.where(clusters == k)
+            for i in range(n):
+                dists[i, k] = kmat[i, i] - 2*np.sum(kmat[i, mask]) / clustnumel[k] + clustersums2[k]
+        # assign to clusters based on distances
+        print("assigning clusts")
+        clusters = np.argmin(dists, axis=1)
+        # calc score
+        score = np.sum(np.choose(clusters, dists.transpose()))
+        iter += 1
+    return score
+
+
+def kmatvalpoly(kmat, dat, i, j, r):
+    if kmat[i, j] != 0:
+        return kmat[i, j]
+    else:
+        kmat[i, j] = kernel_poly(dat[i, :], dat[j, :], r)
+        kmat[j, i] = kmat[i, j]
+        return kmat[i, j]
 
 
 def kmeans_poly(dat, K, r):
@@ -125,26 +195,47 @@ def kmeans_poly(dat, K, r):
     n, ncol = dat.shape
     best = 10 ** 12 + 1
     score = 10 ** 12
-    # initialise clusters and distances of points to clusters
-    C = np.clip(np.random.multivariate_normal(np.mean(dat, axis=0), np.diag(np.std(dat, axis=0)), size=(K,)), 0, 1)
-    dists = np.zeros(shape=(n, K))
+    kmat = np.zeros(shape=(n, n))
+    emptyclusters = True
+    while emptyclusters:
+        # initialise clusters and distances of points to clusters
+        # C = np.clip(np.random.multivariate_normal(np.mean(dat, axis=0), np.diag(np.std(dat, axis=0)), size=(K,)), 0, 1)
+        # uncomment for uniform distribution of clusters instead
+        C = np.random.uniform(low=0, high=1, size=(K, ncol))
+        dists = np.zeros(shape=(n, K))
+        # calc initial distances to clusters
+        print("calcing init dists")
+        for i in range(n):
+            for k in range(K):
+                dists[i, k] = kmatvalpoly(kmat, dat, i, i, r) - 2 * kernel_poly(dat[i, :], C[k, :], r) \
+                              + kernel_poly(C[k, :], C[k, :], r)
+        # calc initial cluster assignment
+        clusters = np.array([np.argmin(dists[i, :]) for i in range(n)])
+        if all([np.count_nonzero(clusters == k) > 0 for k in range(K)]):
+            emptyclusters = False
+        else:
+            print("empty cluster, trying again")
     # run until no improvement
     iter = 0
     while score < best:
         # update new best
         best = score
         # update distances
+        print("updating dists")
+        clustersums = [sum([kmatvalpoly(kmat, dat, i, j, r) for i in range(n) for j in range(n) \
+                            if ((clusters[j] == k) and (clusters[i] == k))]) / np.count_nonzero(clusters == k) ** 2 \
+                       for k in range(K)]
         for i in range(n):
             for k in range(K):
-                dists[i, k] = kernel_poly(dat[i, :], C[k, :], r)
+                dists[i, k] = kmatvalpoly(kmat, dat, i, i, r) - \
+                              2*sum([kmatvalpoly(kmat, dat, i, j, r) for j in range(n) if (clusters[j] == k)]) \
+                              / np.count_nonzero(clusters == k) + clustersums[k]
         # assign to clusters based on distances
+        print("assigning clusts")
         clusters = np.array([np.argmin(dists[i, :]) for i in range(n)])
-        # update centroid locations
-        for k in range(K):
-            C[k, :] = sum([dat[i, :] for i in range(n) if clusters[i] == k]) / np.count_nonzero(clusters == k)
         # calc score
         nclust = [np.count_nonzero(clusters == i) for i in range(K)]
-        score = sum([sum([dists[i, k] for i in range(n) if clusters[i] == k]) for k in range(K)])
+        score = sum([dists[i, k] for i in range(n) for k in range(K) if (clusters[i] == k)])
         iter += 1
     return score
 
@@ -206,8 +297,8 @@ data = normalized_df.to_numpy()
 
 
 # define parameters
-nruns = 1
-Ks = [2, 3, 4, 5]
+nruns = 10
+Ks = [2, 3, 4, 5, 6, 7, 8]
 nKs = len(Ks)
 gam = 0.5
 rr = 2
@@ -224,14 +315,15 @@ for i in range(nKs):
         while not succes:
             try:
                 start = time.time()
-                score = kmeans_gauss(data, ki, rr)  # choose kernel method here
+                score = kmeans_gauss_2(data, ki, gam)  # choose kernel method here
                 timei = time.time() - start
             except ZeroDivisionError:
-                print("empty cluster for k="+str(ki)+",n="+str(ni)+", trying again; ", end='')
+                print("division by zero somehow for for k="+str(ki)+",n="+str(ni)+", trying again; ")
             else:
                 succes = True
                 scores[ni, i] = score
                 times[i] += timei
+                print("  ==> score = " + str(score))
     print()
     times[i] = times[i] / nruns
     print("avg time per run is %.3f seconds" % times[i])
@@ -239,25 +331,25 @@ for i in range(nKs):
 
 ### PLOT
 # achieved score versus number of clusters k
-# fig = plt.figure(figsize=(10, 7))
-# ax = fig.add_subplot(111)
-# bp = ax.boxplot(scores)
-# ax.set_xticklabels([str(ki) for ki in Ks])
-# ax.set_xlabel('K')
-# ax.set_ylabel('Score')
-# plt.show()
-
-# lineplot score vs k for kernel methods
 fig = plt.figure(figsize=(10, 7))
 ax = fig.add_subplot(111)
-lp = ax.plot(Ks, scores)
+bp = ax.boxplot(scores)
+ax.set_xticklabels([str(ki) for ki in Ks])
 ax.set_xlabel('K')
 ax.set_ylabel('Score')
 plt.show()
+
+# lineplot score vs k for kernel methods
+# fig = plt.figure(figsize=(10, 7))
+# ax = fig.add_subplot(111)
+# lp = ax.plot(Ks, scores.mean(axis=0))
+# ax.set_xlabel('K')
+# ax.set_ylabel('Score')
+# plt.show()
 
 # save avg time of kmeans per k to file
 f = open('../LAOMLProject1/times gauss1 v2.txt', 'w')
 f.write("k\td\n")
 for i in range(nKs):
-    f.write("%d\t$.3f\n" % (Ks[i], times[i]))
+    f.write(f'{Ks[i]:10d}\t{times[i]:.3f}\n')
 f.close()
